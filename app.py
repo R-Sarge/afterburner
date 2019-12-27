@@ -2,7 +2,7 @@
 # app.py
 
 from afterburner.api import API
-from middleware import Middleware
+from afterburner.middleware import Middleware
 
 API_BASE = '/api'
 APP_VARS = {
