@@ -3,7 +3,7 @@
 
 import pytest
 
-from api import API
+from afterburner.api import API
 
 @pytest.fixture
 def api():

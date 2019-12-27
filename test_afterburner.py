@@ -3,7 +3,8 @@
 
 import pytest
 
-from api import API
+from afterburner.api import API
+from afterburner.middleware import Middleware
 
 FILE_DIR = 'css'
 FILE_NAME = 'main.css'
@@ -149,7 +150,107 @@ def test_static_content(tmpdir_factory):
     api = API(static_dir=str(static_dir))
     client = api.test_session()
 
-    response = client.get(f'http://testserver/{FILE_DIR}/{FILE_NAME}')
+    response = client.get(f'http://testserver/static/{FILE_DIR}/{FILE_NAME}')
 
     assert response.status_code == 200
     assert response.text == FILE_CONTENTS
+
+def test_middleware_method_call(api, client):
+    process_request_called = False
+    process_response_called = False
+
+    class TestMiddleware(Middleware):
+        def jk__init__(self, app):
+            super().__init__(self, app)
+
+        def process_request(self, request):
+            nonlocal process_request_called
+            process_request_called = True
+
+        def process_response(self, request, response):
+            nonlocal process_response_called
+            process_response_called = True
+
+    api.add_middleware(TestMiddleware)
+
+    @api.route('/')
+    def index(request, response):
+        response.text = 'Testing middleware response...'
+
+    client.get('http://testserver/')
+
+    assert process_request_called is True
+    assert process_response_called is True
+
+def test_function_based_methods(api, client):
+    @api.route('/home', allowed_methods=['post'])
+    def home(request, response):
+        response.text = 'Hello'
+
+    with pytest.raises(AttributeError):
+        client.get('http://testserver/home')
+
+    assert client.post('http://testserver/home').text == 'Hello'
+
+def test_default_function_methods(api, client):
+    @api.route('/test')
+    def test(request, response):
+        response.text = 'Hello'
+
+    assert client.get('http://testserver/test').text == 'Hello'
+    assert client.post('http://testserver/test').text == 'Hello'
+    assert client.put('http://testserver/test').text == 'Hello'
+    assert client.delete('http://testserver/test').text == 'Hello'
+    assert client.options('http://testserver/test').text == 'Hello'
+    assert client.patch('http://testserver/test').text == 'Hello'
+
+def test_json_response(api, client):
+    @api.route('/json', allowed_methods=['get'])
+    def test(request, response):
+        response.json = {'drink': 'Coffee'}
+
+    response = client.get('http://testserver/json')
+    json_body = response.json()
+
+    assert response.headers['Content-type'] == 'application/json'
+    assert json_body['drink'] == 'Coffee'
+
+def test_html_response(api, client):
+    @api.route('/html', allowed_methods=['get'])
+    def test(request, response):
+        response.html = api.template(
+            'index.html',
+            context = {
+                'title': 'Test name',
+                'message': 'Test message'
+            }
+        )
+
+    response = client.get('http://testserver/html')
+
+    assert 'text/html' in response.headers['Content-type']
+    assert 'Test name' in response.text
+    assert 'Test message' in response.text
+
+def test_plaintext_response(api, client):
+    RESPONSE_TEXT = 'Plain text'
+
+    @api.route('/text', allowed_methods=['get'])
+    def test(request, response):
+        response.text = RESPONSE_TEXT
+
+    response = client.get('http://testserver/text')
+
+    assert 'text/plain' in response.headers['Content-type']
+    assert response.text == RESPONSE_TEXT
+
+def test_manual_set_body(api, client):
+    @api.route('/body', allowed_methods=['get'])
+    def test(request, response):
+        response.body = b'Byte body'
+        response.content_type = 'text/plain'
+
+    response = client.get('http://testserver/body')
+
+    assert 'text/plain' in response.headers['Content-type']
+    assert response.text == 'Byte body'

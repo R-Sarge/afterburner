@@ -3,3 +3,7 @@ __pycache__
 .vscode
 venv
 .coverage
+.eggs
+afterburner.egg-info
+build
+dist

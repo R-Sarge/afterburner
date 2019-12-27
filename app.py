@@ -1,7 +1,8 @@
 # Afterburner framework
 # app.py
 
-from api import API
+from afterburner.api import API
+from middleware import Middleware
 
 API_BASE = '/api'
 APP_VARS = {
@@ -9,6 +10,13 @@ APP_VARS = {
 }
 
 app = API()
+
+class CustomMiddleware(Middleware):
+    def process_request(self, request):
+        print('Processing request', request.url)
+
+    def process_response(self, request, response):
+        print('Processing response', request.url)
 
 def custom_exception_handler(request, response, exception_cls):
     exception_str = str(exception_cls)
@@ -23,6 +31,7 @@ def custom_exception_handler(request, response, exception_cls):
     )
 
 app.add_exception_handler(custom_exception_handler)
+app.add_middleware(CustomMiddleware)
 
 @app.route(API_BASE + '/home')
 def home(request, response):
@@ -60,15 +69,23 @@ def sample(request, response):
     output = 'Sample API'
     response.text = output
 
-@app.route('/template')
+@app.route('/template', allowed_methods=['get'])
 def template(request, response):
-    response.body = app.template(
+    response.html = app.template(
         'index.html',
         context = {
             'title': APP_VARS['title'],
-            'message': 'The cool Python framework.'
+            'message': 'The Python framework developed by Ryan Sargent.'
         }
     )
+
+@app.route('/json', allowed_methods=['get'])
+def json_handler(request, response):
+    response.json = {'alchohol': 'Whiskey', 'mixer': 'Coke'}
+
+@app.route('/text', allowed_methods=['get'])
+def text_handler(request, response):
+    response.text = 'Simple text'
 
 @app.route(API_BASE + '/exception')
 def throw_exception(request, response):
